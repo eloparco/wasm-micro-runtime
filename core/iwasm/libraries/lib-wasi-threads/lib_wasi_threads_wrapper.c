@@ -19,6 +19,12 @@ static const char *THREAD_START_FUNCTION = "wasi_thread_start";
 
 static korp_mutex thread_id_lock;
 
+#define MAX_NUM_THREADS 5
+
+// Stack data structure to track available thread ids
+static int32 avail_thread_ids[MAX_NUM_THREADS];
+static int32 avail_thread_id_index;
+
 typedef struct {
     /* app's entry function */
     wasm_function_inst_t start_func;
@@ -31,14 +37,29 @@ typedef struct {
 static int32
 allocate_thread_id()
 {
-    static int32 thread_id = 0;
-
     int32 id;
 
     os_mutex_lock(&thread_id_lock);
-    id = thread_id++;
+    if (avail_thread_id_index < 0) {
+        os_mutex_unlock(&thread_id_lock);
+        LOG_ERROR("Reached maximum number of threads");
+        return -1;
+    }
+
+    // Pop available thread id from `avail_thread_ids` stack
+    id = avail_thread_ids[avail_thread_id_index--];
     os_mutex_unlock(&thread_id_lock);
     return id;
+}
+
+void
+deallocate_thread_id(int32 thread_id)
+{
+    os_mutex_lock(&thread_id_lock);
+    assert(avail_thread_id_index < MAX_NUM_THREADS);
+    // Release thread id by pushing it into `avail_thread_ids` stack
+    avail_thread_ids[++avail_thread_id_index] = thread_id;
+    os_mutex_unlock(&thread_id_lock);
 }
 
 static void *
@@ -59,6 +80,7 @@ thread_start(void *arg)
     }
 
     /* routine exit, destroy instance */
+    deallocate_thread_id(thread_arg->thread_id);
     wasm_runtime_deinstantiate_internal(module_inst, true);
 
     wasm_runtime_free(thread_arg);
@@ -114,6 +136,10 @@ thread_spawn_wrapper(wasm_exec_env_t exec_env, uint32 start_arg)
     }
 
     thread_start_arg->thread_id = thread_id = allocate_thread_id();
+    if (thread_id < 0) {
+        LOG_ERROR("Failed to get thread identifier");
+        goto thread_spawn_fail;
+    }
     thread_start_arg->arg = start_arg;
     thread_start_arg->start_func = start_func;
 
@@ -159,6 +185,11 @@ lib_wasi_threads_init(void)
 {
     if (0 != os_mutex_init(&thread_id_lock))
         return false;
+
+    // Create stack to store thread idenfitiers
+    for (uint32 i = 0; i < MAX_NUM_THREADS; i++)
+        avail_thread_ids[i] = MAX_NUM_THREADS - 1 - i;
+    avail_thread_id_index = MAX_NUM_THREADS - 1;
 
     return true;
 }
