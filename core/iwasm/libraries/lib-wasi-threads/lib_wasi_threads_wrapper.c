@@ -19,11 +19,13 @@ static const char *THREAD_START_FUNCTION = "wasi_thread_start";
 
 static korp_mutex thread_id_lock;
 
-#define MAX_NUM_THREADS 5
-
-// Stack data structure to track available thread ids
-static int32 avail_thread_ids[MAX_NUM_THREADS];
-static int32 avail_thread_id_index;
+// Stack data structure to track available thread identifiers
+#define AVAIL_TIDS_INIT_SIZE CLUSTER_MAX_THREAD_NUM
+typedef struct {
+    int32 *ids;
+    uint32 pos, size;
+} AvailableThreadIds;
+static AvailableThreadIds avail_tids;
 
 typedef struct {
     /* app's entry function */
@@ -40,14 +42,24 @@ allocate_thread_id()
     int32 id;
 
     os_mutex_lock(&thread_id_lock);
-    if (avail_thread_id_index < 0) {
-        os_mutex_unlock(&thread_id_lock);
-        LOG_ERROR("Reached maximum number of threads");
-        return -1;
+    if (avail_tids.pos < 0) {
+        // Resize stack and push new thread ids
+        uint32 old_size = avail_tids.size;
+        avail_tids.size *= 2;
+        avail_tids.pos = old_size - 1;
+        avail_tids.ids = (int32 *)wasm_runtime_realloc(
+            avail_tids.ids, avail_tids.size * sizeof(int32));
+        if (avail_tids.ids == NULL) {
+            os_mutex_unlock(&thread_id_lock);
+            return -1;
+        }
+
+        for (uint32 i = 0; i < old_size; i++)
+            avail_tids.ids[i] = avail_tids.size - 1 - i;
     }
 
-    // Pop available thread id from `avail_thread_ids` stack
-    id = avail_thread_ids[avail_thread_id_index--];
+    // Pop available thread identifier from `avail_tids` stack
+    id = avail_tids.ids[avail_tids.pos--];
     os_mutex_unlock(&thread_id_lock);
     return id;
 }
@@ -56,9 +68,11 @@ void
 deallocate_thread_id(int32 thread_id)
 {
     os_mutex_lock(&thread_id_lock);
-    assert(avail_thread_id_index < MAX_NUM_THREADS);
-    // Release thread id by pushing it into `avail_thread_ids` stack
-    avail_thread_ids[++avail_thread_id_index] = thread_id;
+
+    // Release thread identifier by pushing it into `avail_tids` stack
+    assert(avail_tids.pos < avail_tids.size - 1);
+    avail_tids.ids[++avail_tids.pos] = thread_id;
+
     os_mutex_unlock(&thread_id_lock);
 }
 
@@ -80,9 +94,9 @@ thread_start(void *arg)
     }
 
     /* routine exit, destroy instance */
-    deallocate_thread_id(thread_arg->thread_id);
     wasm_runtime_deinstantiate_internal(module_inst, true);
 
+    deallocate_thread_id(thread_arg->thread_id);
     wasm_runtime_free(thread_arg);
     exec_env->thread_arg = NULL;
 
@@ -148,6 +162,7 @@ thread_spawn_wrapper(wasm_exec_env_t exec_env, uint32 start_arg)
                                      thread_start_arg);
     if (ret != 0) {
         os_mutex_unlock(&exec_env->wait_lock);
+        deallocate_thread_id(thread_id);
         LOG_ERROR("Failed to spawn a new thread");
         goto thread_spawn_fail;
     }
@@ -186,10 +201,17 @@ lib_wasi_threads_init(void)
     if (0 != os_mutex_init(&thread_id_lock))
         return false;
 
-    // Create stack to store thread idenfitiers
-    for (uint32 i = 0; i < MAX_NUM_THREADS; i++)
-        avail_thread_ids[i] = MAX_NUM_THREADS - 1 - i;
-    avail_thread_id_index = MAX_NUM_THREADS - 1;
+    // Initialize stack to store thread identifiers
+    avail_tids.size = AVAIL_TIDS_INIT_SIZE;
+    avail_tids.pos = avail_tids.size - 1;
+    avail_tids.ids =
+        (int32 *)wasm_runtime_malloc(avail_tids.size * sizeof(int32));
+    if (avail_tids.ids == NULL) {
+        os_mutex_destroy(&thread_id_lock);
+        return false;
+    }
+    for (uint32 i = 0; i < avail_tids.size; i++)
+        avail_tids.ids[i] = avail_tids.size - 1 - i;
 
     return true;
 }
@@ -197,5 +219,7 @@ lib_wasi_threads_init(void)
 void
 lib_wasi_threads_destroy(void)
 {
+    wasm_runtime_free(avail_tids.ids);
+    avail_tids.ids = NULL;
     os_mutex_destroy(&thread_id_lock);
 }
