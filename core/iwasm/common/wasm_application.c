@@ -230,6 +230,10 @@ wasm_application_execute_main(WASMModuleInstanceCommon *module_inst, int32 argc,
     wasm_runtime_dump_perf_profiling(module_inst);
 #endif
 
+    const char *exception = wasm_runtime_get_exception(module_inst);
+    if (exception && strcmp(exception, "Exception: wasi proc exit") == 0)
+        wasm_runtime_clear_exception(module_inst);
+
     return (ret && !wasm_runtime_get_exception(module_inst)) ? true : false;
 }
 
