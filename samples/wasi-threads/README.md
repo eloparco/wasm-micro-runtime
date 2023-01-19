@@ -22,3 +22,12 @@ $ ./iwasm wasm-apps/no_pthread.wasm
 ...
 $ ./iwasm wasm-apps/exception_propagation.wasm
 ```
+
+To use AOT:
+
+```shell
+$ ../../../wamr-compiler/build/wamrc \
+    --disable-aux-stack-check \
+    -o wasm-apps/no_pthread.aot wasm-apps/no_pthread.wasm
+$ ./iwasm wasm-apps/no_pthread.aot
+```

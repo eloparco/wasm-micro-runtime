@@ -261,6 +261,7 @@ jit_compile_op_set_global(JitCompContext *cc, uint32 global_idx,
 #endif
         {
             POP_I32(value);
+#if WASM_ENABLE_LIB_WASI_THREADS != 0
             if (is_aux_stack) {
                 JitReg aux_stack_bound = get_aux_stack_bound_reg(cc->jit_frame);
                 JitReg aux_stack_bottom =
@@ -274,6 +275,7 @@ jit_compile_op_set_global(JitCompContext *cc, uint32 global_idx,
                                          JIT_OP_BGTU, cc->cmp_reg, NULL)))
                     goto fail;
             }
+#endif /* WASM_ENABLE_LIB_WASI_THREADS != 0 */
             GEN_INSN(STI32, value, get_module_inst_reg(cc->jit_frame),
                      NEW_CONST(I32, data_offset));
             break;
