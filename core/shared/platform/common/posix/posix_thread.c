@@ -67,7 +67,9 @@ stack_context_sig_handler(int sig)
     sigjmp_buf *context = bh_list_first_elem(context_list);
     assert(context);
 
-    siglongjmp(*context, 1);
+    printf("handler, %p %ld\n", context, self);
+    // siglongjmp(*context, 1);
+    longjmp(*context, 1);
 }
 
 sigjmp_buf *
@@ -111,6 +113,8 @@ stack_ctx_unlock_and_unblock_sig()
 bool
 os_stack_contexts_init()
 {
+    printf("INIT SIGNAL\n");
+
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_handler = stack_context_sig_handler;
@@ -150,6 +154,7 @@ os_stack_contexts_destroy()
 void
 os_remove_stack_context(korp_tid handle, sigjmp_buf *context)
 {
+    printf("remove %ld %p\n", handle, context);
     korp_tid self = pthread_self();
 
     stack_ctx_block_sig_and_lock();
@@ -167,7 +172,8 @@ os_remove_stack_context(korp_tid handle, sigjmp_buf *context)
 bool
 os_is_returning_from_signal(korp_tid handle, sigjmp_buf *context)
 {
-    if (sigsetjmp(*context, 1))
+    // if (sigsetjmp(*context, 1))
+    if (setjmp(*context))
         return true;
 
     stack_ctx_block_sig_and_lock();

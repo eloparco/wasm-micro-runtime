@@ -3937,24 +3937,29 @@ wasm_interp_call_wasm(WASMModuleInstance *module_inst, WASMExecEnv *exec_env,
 
     wasm_exec_env_set_cur_frame(exec_env, frame);
 
-    if (function->is_import_func) {
+    sigjmp_buf *context = os_create_stack_context();
+    if (!os_is_returning_from_signal(exec_env->handle, context)) {
+        if (function->is_import_func) {
 #if WASM_ENABLE_MULTI_MODULE != 0
-        if (function->import_module_inst) {
-            LOG_DEBUG("it is a function of a sub module");
-            wasm_interp_call_func_import(module_inst, exec_env, function,
-                                         frame);
-        }
-        else
+            if (function->import_module_inst) {
+                LOG_DEBUG("it is a function of a sub module");
+                wasm_interp_call_func_import(module_inst, exec_env, function,
+                                             frame);
+            }
+            else
 #endif
-        {
-            LOG_DEBUG("it is an native function");
-            wasm_interp_call_func_native(module_inst, exec_env, function,
-                                         frame);
+            {
+                LOG_DEBUG("it is an native function");
+                wasm_interp_call_func_native(module_inst, exec_env, function,
+                                             frame);
+            }
+        }
+        else {
+            wasm_interp_call_func_bytecode(module_inst, exec_env, function,
+                                           frame);
         }
     }
-    else {
-        wasm_interp_call_func_bytecode(module_inst, exec_env, function, frame);
-    }
+    os_remove_stack_context(exec_env->handle, context);
 
     /* Output the return value to the caller */
     if (!wasm_get_exception(module_inst)) {

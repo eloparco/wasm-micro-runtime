@@ -1458,6 +1458,9 @@ wasm_runtime_access_exce_check_guard_page()
 {
     if (exec_env_tls && exec_env_tls->handle == os_self_thread()) {
         uint32 page_size = os_getpagesize();
+        korp_tid self = pthread_self();
+        printf("SETTING MEM %p %ld\n", exec_env_tls->exce_check_guard_page,
+               self);
         memset(exec_env_tls->exce_check_guard_page, 0, page_size);
     }
 }

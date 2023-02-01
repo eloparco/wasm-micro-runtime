@@ -57,11 +57,13 @@ thread_start(void *arg)
     argv[0] = thread_arg->thread_id;
     argv[1] = thread_arg->arg;
 
+    printf("starting new thread...\n");
     if (!wasm_runtime_call_wasm(exec_env, thread_arg->start_func, 2, argv)) {
         /* Exception has already been spread during throwing */
     }
 
     // Routine exit
+    printf("routine exit\n");
     deallocate_thread_id(thread_arg->thread_id);
     wasm_runtime_free(thread_arg);
     exec_env->thread_arg = NULL;

@@ -96,7 +96,7 @@ do
         ;;
         m)
         echo "set compile target of wamr" ${OPTARG}
-        TARGET=${OPTARG^^} # set target to uppercase if input x86_32 or x86_64 --> X86_32 and X86_64
+        TARGET=${OPTARG} # set target to uppercase if input x86_32 or x86_64 --> X86_32 and X86_64
         ;;
         M)
         echo "enable multi module feature"

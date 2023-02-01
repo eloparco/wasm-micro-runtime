@@ -1444,8 +1444,16 @@ aot_call_function(WASMExecEnv *exec_env, AOTFunctionInstance *function,
         }
 #endif
 
-        ret = invoke_native_internal(exec_env, function->u.func.func_ptr,
-                                     func_type, NULL, NULL, argv, argc, argv);
+        sigjmp_buf *context = os_create_stack_context();
+        pthread_t self = pthread_self();
+        printf("context=%p %ld\n", context, self);
+        if (!os_is_returning_from_signal(exec_env->handle, context))
+            ret =
+                invoke_native_internal(exec_env, function->u.func.func_ptr,
+                                       func_type, NULL, NULL, argv, argc, argv);
+
+        printf("exit context=%p %ld\n", context, self);
+        os_remove_stack_context(exec_env->handle, context);
 
 #if WASM_ENABLE_DUMP_CALL_STACK != 0
         if (aot_get_exception(module_inst)) {

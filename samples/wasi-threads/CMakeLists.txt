@@ -53,15 +53,19 @@ set(WAMR_BUILD_INTERP 1)
 set(WAMR_BUILD_AOT 1)
 set(WAMR_BUILD_JIT 0)
 set(WAMR_BUILD_LIBC_BUILTIN 1)
-set(WAMR_BUILD_FAST_INTERP 1)
+set(WAMR_BUILD_FAST_INTERP 0)
 set(WAMR_BUILD_LIBC_WASI 1)
 set(WAMR_BUILD_LIB_WASI_THREADS 1)
+set(WAMR_BUILD_DEBUG_INTERP 1)
+# set(WASM_ENABLE_CUSTOM_NAME_SECTION 1)
+# set(WAMR_DISABLE_HW_BOUND_CHECK 0)
 
 # compiling and linking flags
 if (NOT (CMAKE_C_COMPILER MATCHES ".*clang.*" OR CMAKE_C_COMPILER_ID MATCHES ".*Clang"))
   set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
 endif ()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat -Wformat-security")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat -Wformat-security -fno-stack-protector")
 
 # build out vmlib
 set(WAMR_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR}/../..)

@@ -545,6 +545,7 @@ thread_manager_start_routine(void *arg)
     /* destroy exec_env */
     wasm_exec_env_destroy_internal(exec_env);
 
+    printf("spawn thread exit\n");
     os_thread_exit(ret);
     return ret;
 }
@@ -1060,8 +1061,13 @@ set_exception_visitor(void *node, void *user_data)
                     sizeof(curr_wasm_inst->cur_exception),
                     wasm_inst->cur_exception, sizeof(wasm_inst->cur_exception));
 
-        if (curr_exec_env->handle)
-            os_thread_signal(curr_exec_env->handle, SIGUSR1);
+        korp_tid self = pthread_self();
+        printf("CANCEL %ld %ld\n", curr_exec_env->handle, self);
+
+        if (curr_exec_env->handle) {
+            int ret = os_thread_signal(curr_exec_env->handle, SIGUSR1);
+            assert(ret == 0);
+        }
 
         /* Terminate the thread so it can exit from dead loops */
         set_thread_cancel_flags(curr_exec_env);

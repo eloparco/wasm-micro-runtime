@@ -1180,7 +1180,10 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                 goto got_exception;
             }
 
-            HANDLE_OP(WASM_OP_NOP) { HANDLE_OP_END(); }
+            HANDLE_OP(WASM_OP_NOP)
+            {
+                HANDLE_OP_END();
+            }
 
             HANDLE_OP(EXT_OP_BLOCK)
             {
@@ -3021,7 +3024,10 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
             HANDLE_OP(WASM_OP_I32_REINTERPRET_F32)
             HANDLE_OP(WASM_OP_I64_REINTERPRET_F64)
             HANDLE_OP(WASM_OP_F32_REINTERPRET_I32)
-            HANDLE_OP(WASM_OP_F64_REINTERPRET_I64) { HANDLE_OP_END(); }
+            HANDLE_OP(WASM_OP_F64_REINTERPRET_I64)
+            {
+                HANDLE_OP_END();
+            }
 
             HANDLE_OP(WASM_OP_I32_EXTEND8_S)
             {
@@ -4184,6 +4190,8 @@ wasm_interp_call_wasm(WASMModuleInstance *module_inst, WASMExecEnv *exec_env,
     wasm_exec_env_set_cur_frame(exec_env, frame);
 
     sigjmp_buf *context = os_create_stack_context();
+    pthread_t self = pthread_self();
+    printf("context=%p %ld\n", context, self);
     if (!os_is_returning_from_signal(exec_env->handle, context)) {
         if (function->is_import_func) {
 #if WASM_ENABLE_MULTI_MODULE != 0
