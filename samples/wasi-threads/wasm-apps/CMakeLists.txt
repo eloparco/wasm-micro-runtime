@@ -37,3 +37,7 @@ endfunction ()
 
 compile_sample(no_pthread.c wasi_thread_start.S)
 compile_sample(thread_termination.c wasi_thread_start.S)
+compile_sample(multiple_threads_until_limit.c wasi_thread_start.S)
+compile_sample(single_thread_multiple_spawns.c wasi_thread_start.S)
+compile_sample(update_shared_data_and_alloc_heap.c wasi_thread_start.S)
+compile_sample(update_global.c wasi_thread_start.S)

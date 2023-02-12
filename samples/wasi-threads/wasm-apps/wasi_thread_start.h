@@ -5,7 +5,7 @@
 #ifndef WASI_THREAD_START_H
 #define WASI_THREAD_START_H
 
-#define STACK_SIZE 32 * 1024 // same as the main stack
+#define STACK_SIZE 128 * 1024 // same as the main stack
 
 typedef struct {
     void *stack;
