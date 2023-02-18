@@ -1422,15 +1422,6 @@ wasm_instantiate(WASMModule *module, bool is_sub_inst, uint32 stack_size,
     module_inst->e =
         (WASMModuleInstanceExtra *)((uint8 *)module_inst + extra_info_offset);
 
-#if WASM_ENABLE_SHARED_MEMORY != 0
-    if (os_mutex_init(&module_inst->e->mem_lock) != 0) {
-        set_error_buf(error_buf, error_buf_size,
-                      "create shared memory lock failed");
-        goto fail;
-    }
-    module_inst->e->mem_lock_inited = true;
-#endif
-
 #if WASM_ENABLE_MULTI_MODULE != 0
     module_inst->e->sub_module_inst_list =
         &module_inst->e->sub_module_inst_list_head;
@@ -1976,11 +1967,6 @@ wasm_deinstantiate(WASMModuleInstance *module_inst, bool is_sub_inst)
     }
 #endif
 
-#if WASM_ENABLE_SHARED_MEMORY != 0
-    if (module_inst->e->mem_lock_inited)
-        os_mutex_destroy(&module_inst->e->mem_lock);
-#endif
-
     if (module_inst->e->c_api_func_imports)
         wasm_runtime_free(module_inst->e->c_api_func_imports);
 
@@ -2308,6 +2294,8 @@ void
 wasm_module_free(WASMModuleInstance *module_inst, uint32 ptr)
 {
     if (ptr) {
+        WASMSharedMemNode *node = wasm_module_get_shared_memory(
+            (WASMModuleCommon *)module_inst->module);
         WASMMemoryInstance *memory = wasm_get_default_memory(module_inst);
         uint8 *addr;
 
@@ -2315,6 +2303,7 @@ wasm_module_free(WASMModuleInstance *module_inst, uint32 ptr)
             return;
         }
 
+        os_mutex_lock(&module->e->mem_lock); // FIX
         addr = memory->memory_data + ptr;
 
         if (memory->heap_handle && memory->heap_data <= addr
@@ -2327,6 +2316,7 @@ wasm_module_free(WASMModuleInstance *module_inst, uint32 ptr)
             execute_free_function(module_inst, module_inst->e->free_function,
                                   ptr);
         }
+        os_mutex_unlock(&module->e->mem_lock); // FIX
     }
 }
 

@@ -1122,12 +1122,20 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
 {
     WASMMemoryInstance *memory = wasm_get_default_memory(module);
     uint8 *global_data = module->global_data;
+
+#if WASM_ENABLE_SHARED_MEMORY != 0
+    WASMSharedMemNode *node =
+        wasm_module_get_shared_memory((WASMModuleCommon *)module->module);
+#endif
+
 #if !defined(OS_ENABLE_HW_BOUND_CHECK)              \
     || WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS == 0 \
     || WASM_ENABLE_BULK_MEMORY != 0
+    os_mutex_lock(&module->e->mem_lock); // FIX
     uint32 num_bytes_per_page = memory ? memory->num_bytes_per_page : 0;
     uint32 linear_mem_size =
         memory ? num_bytes_per_page * memory->cur_page_count : 0;
+    os_mutex_unlock(&module->e->mem_lock); // FIX
 #endif
     WASMType **wasm_types = module->module->types;
     WASMGlobalInstance *globals = module->e->globals, *global;
@@ -1150,6 +1158,12 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
     uint8 local_type, *global_addr;
     uint32 cache_index, type_index, param_cell_num, cell_num;
     uint8 value_type;
+
+    // #if WASM_ENABLE_SHARED_MEMORY != 0
+    //     WASMSharedMemNode *node =
+    //         wasm_module_get_shared_memory((WASMModuleCommon
+    //         *)module->module);
+    // #endif
 
 #if WASM_ENABLE_DEBUG_INTERP != 0
     uint8 *frame_ip_orig = NULL;
@@ -1180,7 +1194,10 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                 goto got_exception;
             }
 
-            HANDLE_OP(WASM_OP_NOP) { HANDLE_OP_END(); }
+            HANDLE_OP(WASM_OP_NOP)
+            {
+                HANDLE_OP_END();
+            }
 
             HANDLE_OP(EXT_OP_BLOCK)
             {
@@ -2091,7 +2108,10 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                 read_leb_uint32(frame_ip, frame_ip_end, reserved);
                 delta = (uint32)POP_I32();
 
-                if (!wasm_enlarge_memory(module, delta)) {
+                os_mutex_lock(&module->e->mem_lock);
+                bool ret = wasm_enlarge_memory(module, delta);
+                os_mutex_unlock(&module->e->mem_lock);
+                if (!ret) {
                     /* failed to memory.grow, return -1 */
                     PUSH_I32(-1);
                 }
@@ -3017,7 +3037,10 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
             HANDLE_OP(WASM_OP_I32_REINTERPRET_F32)
             HANDLE_OP(WASM_OP_I64_REINTERPRET_F64)
             HANDLE_OP(WASM_OP_F32_REINTERPRET_I32)
-            HANDLE_OP(WASM_OP_F64_REINTERPRET_I64) { HANDLE_OP_END(); }
+            HANDLE_OP(WASM_OP_F64_REINTERPRET_I64)
+            {
+                HANDLE_OP_END();
+            }
 
             HANDLE_OP(WASM_OP_I32_EXTEND8_S)
             {
@@ -3431,6 +3454,7 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                         CHECK_BULK_MEMORY_OVERFLOW(addr + offset, 8, maddr);
                         CHECK_ATOMIC_MEMORY_ACCESS();
 
+                        // FIX
                         ret = wasm_runtime_atomic_wait(
                             (WASMModuleInstanceCommon *)module, maddr, expect,
                             timeout, true);
@@ -3638,6 +3662,7 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
                             readv = LOAD_I32(maddr);
                             if (readv == expect)
                                 STORE_U32(maddr, sval);
+                            // printf("CMPXCHG\n");
                             os_mutex_unlock(&module->e->mem_lock);
                         }
                         PUSH_I32(readv);

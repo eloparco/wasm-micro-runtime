@@ -1721,7 +1721,9 @@ load_import_section(const uint8 *buf, const uint8 *buf_end, WASMModule *module,
 
             switch (kind) {
                 case IMPORT_KIND_FUNC: /* import function */
-                    bh_assert(import_functions);
+                    // bh_assert(import_functions);
+                    if (!import_functions)
+                        break;
                     import = import_functions++;
                     if (!load_function_import(
                             &p, p_end, module, sub_module_name, field_name,

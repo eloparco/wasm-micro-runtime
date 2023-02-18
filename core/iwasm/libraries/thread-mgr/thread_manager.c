@@ -529,7 +529,7 @@ fail4:
     /* free the allocated aux stack space */
     free_aux_stack(exec_env, aux_stack_start);
 fail3:
-    wasm_exec_env_destroy(new_exec_env);
+    wasm_exec_env_destroy_internal(new_exec_env);
 fail2:
     wasm_runtime_deinstantiate_internal(new_module_inst, true);
 fail1:
@@ -667,7 +667,7 @@ fail3:
     if (alloc_aux_stack)
         free_aux_stack(exec_env, aux_stack_start);
 fail2:
-    wasm_exec_env_destroy(new_exec_env);
+    wasm_exec_env_destroy_internal(new_exec_env);
 fail1:
     os_mutex_unlock(&cluster->lock);
 
@@ -815,15 +815,18 @@ clusters_have_exec_env(WASMExecEnv *exec_env)
     WASMExecEnv *node;
 
     while (cluster) {
+        os_mutex_lock(&cluster->lock);
         node = bh_list_first_elem(&cluster->exec_env_list);
 
         while (node) {
             if (node == exec_env) {
                 bh_assert(exec_env->cluster == cluster);
+                os_mutex_unlock(&cluster->lock);
                 return true;
             }
             node = bh_list_elem_next(node);
         }
+        os_mutex_unlock(&cluster->lock);
 
         cluster = bh_list_elem_next(cluster);
     }
@@ -836,8 +839,8 @@ wasm_cluster_join_thread(WASMExecEnv *exec_env, void **ret_val)
 {
     korp_tid handle;
 
-    os_mutex_lock(&cluster_list_lock);
-    os_mutex_lock(&exec_env->cluster->lock);
+    // os_mutex_lock(&cluster_list_lock);
+    // os_mutex_lock(&exec_env->cluster->lock);
 
     if (!clusters_have_exec_env(exec_env) || exec_env->thread_is_detached) {
         /* Invalid thread, thread has exited or thread has been detached */

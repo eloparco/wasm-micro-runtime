@@ -53,9 +53,10 @@ set(WAMR_BUILD_INTERP 1)
 set(WAMR_BUILD_AOT 1)
 set(WAMR_BUILD_JIT 0)
 set(WAMR_BUILD_LIBC_BUILTIN 1)
-set(WAMR_BUILD_FAST_INTERP 1)
+set(WAMR_BUILD_FAST_INTERP 0)
 set(WAMR_BUILD_LIBC_WASI 1)
 set(WAMR_BUILD_LIB_WASI_THREADS 1)
+# set(WAMR_DISABLE_HW_BOUND_CHECK 1)
 
 # compiling and linking flags
 if (NOT (CMAKE_C_COMPILER MATCHES ".*clang.*" OR CMAKE_C_COMPILER_ID MATCHES ".*Clang"))
@@ -77,11 +78,16 @@ add_subdirectory(wasm-apps)
 ################ wamr runtime ################
 include (${SHARED_DIR}/utils/uncommon/shared_uncommon.cmake)
 
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=thread")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread")
+
 set (RUNTIME_SOURCE_ALL
     ${CMAKE_CURRENT_LIST_DIR}/../../product-mini/platforms/linux/main.c
     ${UNCOMMON_SHARED_SOURCE}
 )
 add_executable (iwasm ${RUNTIME_SOURCE_ALL})
+# target_compile_options(iwasm PRIVATE -fsanitize=address)
+# target_link_options(iwasm PRIVATE -fsanitize=address)
 check_pie_supported()
 set_target_properties (iwasm PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(iwasm vmlib -lpthread -lm -ldl)

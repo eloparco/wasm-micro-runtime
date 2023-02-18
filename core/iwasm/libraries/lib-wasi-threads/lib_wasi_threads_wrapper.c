@@ -84,8 +84,8 @@ thread_spawn_wrapper(wasm_exec_env_t exec_env, uint32 start_arg)
     WASIContext *wasi_ctx;
 #endif
 
-    bh_assert(module);
-    bh_assert(module_inst);
+    // bh_assert(module);
+    // bh_assert(module_inst);
 
     stack_size = ((WASMModuleInstance *)module_inst)->default_wasm_stack_size;
 
