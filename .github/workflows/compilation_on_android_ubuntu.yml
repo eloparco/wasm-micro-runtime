@@ -504,6 +504,13 @@ jobs:
           cmake ..
           cmake --build . --config Release --parallel 4
           ./iwasm wasm-apps/no_pthread.wasm
+      
+      - name: Build Sample [wasm-c-api-imports]
+        run: |
+          cmake -S . -B build
+          cmake --build build --config Release --parallel 4
+          ./build/example1
+        working-directory: samples/wasm-c-api-imports
 
   test:
     needs:
