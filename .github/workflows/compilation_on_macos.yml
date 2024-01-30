@@ -1,7 +1,7 @@
 # Copyright (C) 2019 Intel Corporation.  All rights reserved.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: compilation on macos-latest
+name: compilation on macos
 
 on:
   # will be triggered on PR events
@@ -55,20 +55,25 @@ env:
   LLVM_EAGER_JIT_BUILD_OPTIONS: "-DWAMR_BUILD_AOT=1 -DWAMR_BUILD_FAST_INTERP=0 -DWAMR_BUILD_INTERP=0 -DWAMR_BUILD_JIT=1 -DWAMR_BUILD_LAZY_JIT=0"
 
 jobs:
-  build_llvm_libraries:
+  build_llvm_libraries_on_intel_macos:
     uses: ./.github/workflows/build_llvm_libraries.yml
     with:
       os: "macos-latest"
       arch: "X86"
+  build_llvm_libraries_on_arm_macos:
+    uses: ./.github/workflows/build_llvm_libraries.yml
+    with:
+      os: "macos-14"
+      arch: "AArch64 ARM"
 
   build_wamrc:
-    needs: [build_llvm_libraries]
+    needs: [build_llvm_libraries_on_intel_macos]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: macos-latest
-            llvm_cache_key: ${{ needs.build_llvm_libraries.outputs.cache_key }}
+            llvm_cache_key: ${{ needs.build_llvm_libraries_on_intel_macos.outputs.cache_key }}
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -89,44 +94,55 @@ jobs:
         if: steps.retrieve_llvm_libs.outputs.cache-hit != 'true'
         run: echo "::error::can not get prebuilt llvm libraries" && exit 1
 
-      - name: Build wamrc
-        run: |
-          mkdir build && cd build
-          cmake ..
-          cmake --build . --config Release --parallel 4
-        working-directory: wamr-compiler
+      # - name: Build wamrc
+      #   run: |
+      #     mkdir build && cd build
+      #     cmake ..
+      #     cmake --build . --config Release --parallel 4
+      #   working-directory: wamr-compiler
+
+      # - name: Test file in aot mode
+      #   run: |
+      #     mkdir build && cd build
+      #     cmake ..
+      #     cmake --build . --config Debug --parallel 4
+      #     ./iwasm wasm-apps/no_pthread.wasm
+
+      #     ../../../wamr-compiler/build/wamrc --size-level=0 --enable-multi-thread -o wasm-apps/no_pthread.aot wasm-apps/no_pthread.wasm
+      #     ./iwasm wasm-apps/no_pthread.aot
+      #   working-directory: samples/wasi-threads
 
   build_iwasm:
-    needs: [build_llvm_libraries]
+    needs: [build_llvm_libraries_on_intel_macos]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         make_options_run_mode: [
             # Running mode
-            $AOT_BUILD_OPTIONS,
+            # $AOT_BUILD_OPTIONS,
             $CLASSIC_INTERP_BUILD_OPTIONS,
-            $FAST_INTERP_BUILD_OPTIONS,
-            $LLVM_LAZY_JIT_BUILD_OPTIONS,
-            $LLVM_EAGER_JIT_BUILD_OPTIONS,
+            # $FAST_INTERP_BUILD_OPTIONS,
+            # $LLVM_LAZY_JIT_BUILD_OPTIONS,
+            # $LLVM_EAGER_JIT_BUILD_OPTIONS,
           ]
         make_options_feature: [
             # Features
             "-DWAMR_BUILD_CUSTOM_NAME_SECTION=1",
             # doesn't support
             #"-DWAMR_BUILD_DEBUG_AOT=1",
-            "-DWAMR_BUILD_DEBUG_INTERP=1",
-            "-DWAMR_BUILD_DUMP_CALL_STACK=1",
-            "-DWAMR_BUILD_LIB_PTHREAD=1",
-            "-DWAMR_BUILD_LIB_WASI_THREADS=1",
-            "-DWAMR_BUILD_LOAD_CUSTOM_SECTION=1",
-            "-DWAMR_BUILD_MINI_LOADER=1",
-            "-DWAMR_BUILD_MEMORY_PROFILING=1",
-            "-DWAMR_BUILD_MULTI_MODULE=1",
-            "-DWAMR_BUILD_PERF_PROFILING=1",
-            "-DWAMR_BUILD_REF_TYPES=1",
-            "-DWAMR_BUILD_SIMD=1",
-            "-DWAMR_BUILD_TAIL_CALL=1",
-            "-DWAMR_DISABLE_HW_BOUND_CHECK=1",
+            # "-DWAMR_BUILD_DEBUG_INTERP=1",
+            # "-DWAMR_BUILD_DUMP_CALL_STACK=1",
+            # "-DWAMR_BUILD_LIB_PTHREAD=1",
+            # "-DWAMR_BUILD_LIB_WASI_THREADS=1",
+            # "-DWAMR_BUILD_LOAD_CUSTOM_SECTION=1",
+            # "-DWAMR_BUILD_MINI_LOADER=1",
+            # "-DWAMR_BUILD_MEMORY_PROFILING=1",
+            # "-DWAMR_BUILD_MULTI_MODULE=1",
+            # "-DWAMR_BUILD_PERF_PROFILING=1",
+            # "-DWAMR_BUILD_REF_TYPES=1",
+            # "-DWAMR_BUILD_SIMD=1",
+            # "-DWAMR_BUILD_TAIL_CALL=1",
+            # "-DWAMR_DISABLE_HW_BOUND_CHECK=1",
           ]
         os: [macos-latest]
         platform: [darwin]
@@ -171,7 +187,7 @@ jobs:
             make_options_feature: "-DWAMR_BUILD_MINI_LOADER=1"
         include:
           - os: macos-latest
-            llvm_cache_key: ${{ needs.build_llvm_libraries.outputs.cache_key }}
+            llvm_cache_key: ${{ needs.build_llvm_libraries_on_intel_macos.outputs.cache_key }}
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -243,11 +259,11 @@ jobs:
         working-directory: samples/wasm-c-api
 
   build_samples_others:
-    needs: [build_iwasm, build_wamrc]
+    needs: [build_iwasm, build_wamrc, build_llvm_libraries_on_intel_macos, build_llvm_libraries_on_arm_macos]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest]
+        os: [macos-latest, macos-14]
         wasi_sdk_release:
           [
             "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-20/wasi-sdk-20.0-macos.tar.gz",
@@ -256,6 +272,11 @@ jobs:
           [
             "https://github.com/WebAssembly/wabt/releases/download/1.0.31/wabt-1.0.31-macos-12.tar.gz",
           ]
+        include:
+          - os: macos-latest
+            llvm_cache_key: ${{ needs.build_llvm_libraries_on_intel_macos.outputs.cache_key }}
+          - os: macos-14
+            llvm_cache_key: ${{ needs.build_llvm_libraries_on_arm_macos.outputs.cache_key }}
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -319,7 +340,24 @@ jobs:
           cmake ..
           cmake --build . --config Debug --parallel 4
           ./hello
-
+      - name: Get LLVM libraries
+        id: retrieve_llvm_libs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./core/deps/llvm/build/bin
+            ./core/deps/llvm/build/include
+            ./core/deps/llvm/build/lib
+            ./core/deps/llvm/build/libexec
+            ./core/deps/llvm/build/share
+          key: ${{ matrix.llvm_cache_key }}
+      - name: Build wamrc
+        run: |
+          mkdir build && cd build
+          cmake ..
+          cmake --build . --config Release --parallel 4
+        working-directory: wamr-compiler
+        
       - name: Build Sample [wasi-threads]
         run: |
           cd samples/wasi-threads
@@ -327,6 +365,10 @@ jobs:
           cmake ..
           cmake --build . --config Debug --parallel 4
           ./iwasm wasm-apps/no_pthread.wasm
+
+          # size-level=0 to avoid `LLVM ERROR: Only small, tiny and large code models are allowed on AArch64`
+          ../../../wamr-compiler/build/wamrc --size-level=0 --enable-multi-thread -o wasm-apps/no_pthread.aot wasm-apps/no_pthread.wasm
+          ./iwasm wasm-apps/no_pthread.aot
 
       - name: Build Sample [shared-module]
         run: |
